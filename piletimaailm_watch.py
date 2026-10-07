@@ -20,14 +20,14 @@ from bs4 import BeautifulSoup
 
 # One entry per play. "dates" is optional: leave it out (or []) to watch all dates.
 PLAYS = [
-    {
-        "url": "https://www.piletimaailm.com/performances/97714-lehman-brothers",
+    #{
+        #"url": "https://www.piletimaailm.com/performances/97714-lehman-brothers",
         # "dates": ["16.10.2026", "06.11.2026"],
-    },
+    #},
      {
          "url": "https://www.piletimaailm.com/performances/130852-b-koondis",
     #   "dates": [],
-    },
+    }
 ]
 
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "change-me-to-something-unique-lehman-tickets")
