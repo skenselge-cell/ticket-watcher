@@ -22,7 +22,7 @@ jobs:
         run: pip install requests beautifulsoup4
 
       - name: Check tickets
-        run: python piletimaailm_watch.py
+        run: python piletimaailm_watch(1).py
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
 
