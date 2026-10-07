@@ -24,10 +24,10 @@ PLAYS = [
         "url": "https://www.piletimaailm.com/performances/97714-lehman-brothers",
         # "dates": ["16.10.2026", "06.11.2026"],
     },
-    # {
-    #     "url": "https://www.piletimaailm.com/performances/NNNNN-other-play",
-    #     "dates": [],
-    # },
+     {
+         "url": "https://www.piletimaailm.com/performances/130852-b-koondis",
+    #   "dates": [],
+    },
 ]
 
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "change-me-to-something-unique-lehman-tickets")
