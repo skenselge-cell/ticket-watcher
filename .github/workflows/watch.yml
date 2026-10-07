@@ -26,6 +26,9 @@ jobs:
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
 
+      - name: Test notification
+        run: curl -d "Test from GitHub Actions" "ntfy.sh/${{ secrets.NTFY_TOPIC }}"
+
       - name: Save state
         run: |
           git config user.name "ticket-bot"
