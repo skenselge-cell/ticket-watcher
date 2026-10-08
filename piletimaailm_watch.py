@@ -21,7 +21,7 @@ from bs4 import BeautifulSoup
 # One entry per play. "dates" is optional: leave it out (or []) to watch all dates.
 PLAYS = [
     {
-        "url": "https://www.piletimaailm.com/performances/141493-ukskord-liibanonis",
+        "url": "https://www.piletimaailm.com/performances/121675-voorad",
         # "dates": ["16.10.2026", "06.11.2026"],
     },
      {
