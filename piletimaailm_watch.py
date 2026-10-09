@@ -23,19 +23,20 @@ PLAYS = [
     {
         "url": "https://www.piletimaailm.com/performances/121675-voorad",
         # "dates": ["16.10.2026", "06.11.2026"],
-    },
-     {
+    }, {
          "url": "https://www.piletimaailm.com/performances/130852-b-koondis",
     #   "dates": [],
-    },
-    {
+    }, {
          "url": "https://www.piletimaailm.com/performances/122639-cafe-theatral",
     #   "dates": [],
-    },
-     {
-         "url": " https://www.piletimaailm.com/performances/145868-caligula",
+    }, {
+         "url": "https://www.piletimaailm.com/performances/145868-caligula",
+    #   "dates": [],
+    }, {
+         "url": "https://www.piletimaailm.com/performances/153983-maarja-tombas-tinderi",
     #   "dates": [],
     }
+    
 ]
 
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "change-me-to-something-unique-lehman-tickets")
