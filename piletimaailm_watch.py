@@ -27,9 +27,6 @@ PLAYS = [
          "url": "https://www.piletimaailm.com/performances/130852-b-koondis",
     #   "dates": [],
     }, {
-         "url": "https://www.piletimaailm.com/performances/122639-cafe-theatral",
-    #   "dates": [],
-    }, {
          "url": "https://www.piletimaailm.com/performances/145868-caligula",
     #   "dates": [],
     }, {
