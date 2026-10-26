@@ -20,10 +20,11 @@ from pathlib import Path
 from urllib.parse import urljoin, urlparse
 
 import requests
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 # One entry per play. "dates" is optional: leave it out (or []) to watch all dates,
 # e.g. "dates": ["16.10.2026"].
+
 PLAYS = [
      {"url": "https://piletikeskus.ee/et/s/mees-nimega-ove"},
     {
@@ -102,26 +103,40 @@ def resolve_piletikeskus_show(url):
 def fetch_piletikeskus(url):
     """Return (name, {'26.10.2026 19:00': 0 or N})
 
-    A date counts as available when its entry has an "Osta pilet" (buy) button.
+    A date counts as available only when its entry has a real buy link
+    (a link to /select-ticket/...) or a visible "Osta pilet" button.
     The value is the "Viimased N piletit" number when shown, otherwise 1.
+    Script/style data is ignored so hidden strings can't cause false positives.
     """
     show_url, soup = resolve_piletikeskus_show(url)
     if soup is None or show_url != url:
         soup = get_soup(show_url)
     name = page_name(soup, show_url)
+
+    for tag in soup(["script", "style", "noscript", "template"]):
+        tag.decompose()
+    for a in soup.find_all("a", href=re.compile(r"select-ticket")):
+        a.replace_with(NavigableString(" [[BUY]] "))
     text = soup.get_text("\n")
 
-    result = {}
     matches = list(PK_DATE_RE.finditer(text))
+    if matches:
+        # Ignore the footer (gift cards, app promo, ...) after the last entry
+        footer = text.find("Piletiostjale", matches[-1].end())
+        if footer != -1:
+            text = text[:footer]
+
+    result = {}
     for i, m in enumerate(matches):
         block_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
         block = text[m.end() : block_end]
         key = f"{m.group(1)} {m.group(2)}"
-        if re.search(r"Osta\s+pilet", block, re.I):
+        if "[[BUY]]" in block or re.search(r"Osta\s+pilet", block, re.I):
             last = PK_LAST_RE.search(block)
             result[key] = int(last.group(1)) if last else 1
         else:
             result[key] = 0
+        print(f"  {key}: {'AVAILABLE' if result[key] else 'sold out'} | {' '.join(block.split())[:110]}")
     return name, result
 
 
