@@ -26,7 +26,6 @@ from bs4 import BeautifulSoup, NavigableString
 # e.g. "dates": ["16.10.2026"].
 
 PLAYS = [
-     {"url": "https://piletikeskus.ee/et/s/mees-nimega-ove"},
     {
       "url": "https://piletikeskus.ee/et/s/nimi"  
     },
