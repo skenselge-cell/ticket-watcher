@@ -1,25 +1,34 @@
 #!/usr/bin/env python3
 """
-Watch one or more Piletimaailm performance pages and send a push notification
-(ntfy.sh) when a date goes from sold out to having free seats.
+Watch ticket pages on Piletimaailm and Piletikeskus and send a push
+notification (ntfy.sh) when a date goes from sold out to available.
 
 Setup:
     pip install requests beautifulsoup4
     Set the NTFY_TOPIC environment variable (GitHub: repository secret).
 
-To watch another play, add its page URL to PLAYS below.
+To watch another play, add its page URL to PLAYS below. The site is detected
+from the URL. For piletikeskus.ee you can use either the show page
+(https://piletikeskus.ee/et/s/<name>) or any single event page
+(https://piletikeskus.ee/et/e/<id>), which is resolved to its show page.
 """
 import json
 import os
 import re
 import sys
 from pathlib import Path
+from urllib.parse import urljoin, urlparse
 
 import requests
 from bs4 import BeautifulSoup
 
-# One entry per play. "dates" is optional: leave it out (or []) to watch all dates.
+# One entry per play. "dates" is optional: leave it out (or []) to watch all dates,
+# e.g. "dates": ["16.10.2026"].
 PLAYS = [
+     {"url": "https://piletikeskus.ee/et/s/mees-nimega-ove"},
+    {
+      "url": "https://piletikeskus.ee/et/s/nimi"  
+    },
     {
         "url": "https://www.piletimaailm.com/performances/121675-voorad",
         # "dates": ["16.10.2026", "06.11.2026"],
@@ -29,29 +38,34 @@ PLAYS = [
     }, {
          "url": "https://www.piletimaailm.com/performances/145868-caligula",
     #   "dates": [],
-    }, {
-         "url": "https://www.piletimaailm.com/performances/153983-maarja-tombas-tinderi",
-    #   "dates": [],
     }
-    
 ]
 
 NTFY_TOPIC = os.environ.get("NTFY_TOPIC", "change-me-to-something-unique-lehman-tickets")
 STATE_FILE = Path(__file__).with_name("piletimaailm_state.json")
-
-DATE_RE = re.compile(r"(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})")
-SEATS_RE = re.compile(r"Vabu kohti:\s*(\d+)")
+HEADERS = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"}
 
 
-def fetch_play(url):
-    """Return (play_name, {'07.10.2026 19:00': free_seats, ...})"""
-    r = requests.get(url, headers={"User-Agent": "Mozilla/5.0 (ticket-watcher)"}, timeout=30)
+def get_soup(url):
+    r = requests.get(url, headers=HEADERS, timeout=30)
     r.raise_for_status()
-    soup = BeautifulSoup(r.text, "html.parser")
+    return BeautifulSoup(r.text, "html.parser")
 
-    title = soup.title.get_text(strip=True) if soup.title else url
-    name = title.split("|")[0].strip() or url
 
+def page_name(soup, fallback):
+    title = soup.title.get_text(strip=True) if soup.title else ""
+    return re.split(r"\s[|–-]\s", title)[0].strip() or fallback
+
+
+# ---------------------------------------------------------------- piletimaailm.com
+PM_DATE_RE = re.compile(r"(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2})")
+PM_SEATS_RE = re.compile(r"Vabu kohti:\s*(\d+)")
+
+
+def fetch_piletimaailm(url):
+    """Return (name, {'07.10.2026 19:00': free_seats})"""
+    soup = get_soup(url)
+    name = page_name(soup, url)
     text = soup.get_text("\n")
     start = text.find("Toimumisajad")
     end = text.find("Ürituste otsing")
@@ -59,15 +73,68 @@ def fetch_play(url):
         text = text[start : end if end > start else None]
 
     result = {}
-    matches = list(DATE_RE.finditer(text))
+    matches = list(PM_DATE_RE.finditer(text))
     for i, m in enumerate(matches):
         block_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
-        seats = SEATS_RE.search(text[m.end() : block_end])
+        seats = PM_SEATS_RE.search(text[m.end() : block_end])
         if seats:
             result[f"{m.group(1)} {m.group(2)}"] = int(seats.group(1))
     return name, result
 
 
+# ---------------------------------------------------------------- piletikeskus.ee
+PK_DATE_RE = re.compile(r"(\d{2}\.\d{2}\.\d{4})\s+kell\s+(\d{2}:\d{2})")
+PK_LAST_RE = re.compile(r"Viimased\s+(\d+)\s+pilet", re.I)
+
+
+def resolve_piletikeskus_show(url):
+    """Event pages (/et/e/<id>) are resolved to their show page (/et/s/<slug>)."""
+    path = urlparse(url).path
+    if "/s/" in path:
+        return url, None
+    soup = get_soup(url)
+    for a in soup.find_all("a", href=True):
+        if re.search(r"/et/s/[^/?#]+", a["href"]):
+            return urljoin(url, a["href"]), soup
+    return url, soup  # no show link found: parse the page we have
+
+
+def fetch_piletikeskus(url):
+    """Return (name, {'26.10.2026 19:00': 0 or N})
+
+    A date counts as available when its entry has an "Osta pilet" (buy) button.
+    The value is the "Viimased N piletit" number when shown, otherwise 1.
+    """
+    show_url, soup = resolve_piletikeskus_show(url)
+    if soup is None or show_url != url:
+        soup = get_soup(show_url)
+    name = page_name(soup, show_url)
+    text = soup.get_text("\n")
+
+    result = {}
+    matches = list(PK_DATE_RE.finditer(text))
+    for i, m in enumerate(matches):
+        block_end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        block = text[m.end() : block_end]
+        key = f"{m.group(1)} {m.group(2)}"
+        if re.search(r"Osta\s+pilet", block, re.I):
+            last = PK_LAST_RE.search(block)
+            result[key] = int(last.group(1)) if last else 1
+        else:
+            result[key] = 0
+    return name, result
+
+
+def fetch_play(url):
+    host = urlparse(url).netloc.lower()
+    if "piletikeskus" in host:
+        return fetch_piletikeskus(url)
+    if "piletimaailm" in host:
+        return fetch_piletimaailm(url)
+    raise ValueError(f"Unsupported site: {host}")
+
+
+# ---------------------------------------------------------------- notify + main
 def notify(title, message, click_url):
     requests.post(
         f"https://ntfy.sh/{NTFY_TOPIC}",
@@ -86,7 +153,7 @@ def main():
         url = play["url"]
         try:
             name, current = fetch_play(url)
-        except Exception as e:  # network error, blocked, etc.
+        except Exception as e:  # network error, blocked, unsupported site, etc.
             print(f"{url}: error {e}")
             failed = True
             new_state[url] = state.get(url, {})  # keep old state
@@ -108,7 +175,7 @@ def main():
 
         # Notify only on a change from 0 free seats to >0 (not on every run)
         newly_available = [
-            f"{date}: {seats} free"
+            f"{date}: {seats} free" if seats > 1 else f"{date}: available"
             for date, seats in current.items()
             if seats > 0 and previous.get(date, 0) == 0
         ]
