@@ -26,17 +26,14 @@ from bs4 import BeautifulSoup, NavigableString
 # e.g. "dates": ["16.10.2026"].
 
 PLAYS = [
-    {
-      "url": "https://piletikeskus.ee/et/s/nimi"  
-    },
+    #{
+     # "url": "https://piletikeskus.ee/et/s/nimi"  
+    #},
     {
         "url": "https://www.piletimaailm.com/performances/121675-voorad",
         # "dates": ["16.10.2026", "06.11.2026"],
     }, {
          "url": "https://www.piletimaailm.com/performances/130852-b-koondis",
-    #   "dates": [],
-    }, {
-         "url": "https://www.piletimaailm.com/performances/145868-caligula",
     #   "dates": [],
     }
 ]
